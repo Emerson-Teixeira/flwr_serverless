@@ -1,4 +1,4 @@
-flwr<1.7
+flwr>=1.13
 python-dotenv
 
 
