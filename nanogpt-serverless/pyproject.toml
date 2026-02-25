@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nanogpt-serverless"
+version = "0.1.0"
+description = "Serverless federated NanoGPT on Shakespeare — a Flower Hub app"
+license = "Apache-2.0"
+dependencies = [
+    "flwr>=1.13",
+    "torch>=2.0.0",
+    "numpy",
+    "requests",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nanogpt_serverless"]
