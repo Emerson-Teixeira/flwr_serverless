@@ -7,7 +7,7 @@ This app vendors `flwr_serverless` modules so it can be distributed as a standal
 ## Quick Start
 
 ```bash
-cd nanogpt-serverless
+cd flower_app_nanogpt_serverless
 pip install -e .
 python -m nanogpt_serverless.main
 ```
