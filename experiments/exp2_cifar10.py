@@ -1,5 +1,13 @@
 # Tensorflow logging level: warnings or higher
 import os
+import logging
+import sys 
+
+logging.getLogger("flwr_serverless").setLevel(logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 from tensorflow.keras.utils import set_random_seed
@@ -12,7 +20,6 @@ if __name__ == "__main__":
     # starts a new run
     from argparse import ArgumentParser
     from dotenv import load_dotenv
-
     load_dotenv()
 
     parser = ArgumentParser(
@@ -24,14 +31,14 @@ if __name__ == "__main__":
         "project": "cifar10",
         "epochs": 20,
         "batch_size": 128,
-        "steps_per_epoch": 1200,
+        "steps_per_epoch": 100,
         "lr": 0.0005,
-        "num_nodes": 2,
-        "use_async": False,
+        "num_nodes": 3,
+        "use_async": True,
         "federated_type": "concurrent",
         "dataset": "cifar10",
         "strategy": "fedavg",
-        "data_split": "skewed",
+        "data_split": "random",
         "skew_factor": 0.9,
         "test_steps": None,  # 50,
         "net": "resnet18",

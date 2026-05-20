@@ -65,8 +65,9 @@ class AsyncFederatedNode:
         self,
         shared_folder: SharedFolder,
         strategy: Strategy,
-        ignore_seen_models: bool = False,
+        ignore_seen_models: bool = True,
         node_id: str = None,
+        hinge_b: int = 2,   
     ):
         self.node_id = node_id or str(uuid4())
         self.counter = 0
@@ -75,6 +76,8 @@ class AsyncFederatedNode:
         self.sample_sizes_from_other_nodes = {}  # node_id -> num_examples
         self.ignore_seen_models = ignore_seen_models
         self.seen_models = set()
+        self._current_epoch = 0
+        self.hinge_b = hinge_b
 
     def _aggregate(
         self,
@@ -146,11 +149,28 @@ class AsyncFederatedNode:
             if isinstance(value, dict) and "model_hash" in value:
                 if key != self.node_id:
                     model_hash = value["model_hash"]
-                    if (
-                        not self.ignore_seen_models
-                    ) or model_hash not in self.seen_models:
-                        self.seen_models.add(model_hash)
-                        unseen_parameters_from_other_nodes.append(value["aggregatable"])
+                    if (self.ignore_seen_models) and (model_hash in self.seen_models):
+                        continue
+                    self.seen_models.add(model_hash)
+                    aggregatable: Aggregatable = value["aggregatable"]
+                    sender_epoch = value.get("epoch")
+                    if sender_epoch is not None:
+                        tau = max(0, self._current_epoch - sender_epoch)
+                        alpha = self._alpha(tau)
+
+                        LOGGER.info(
+                            f"node {self.node_id}: nó '{key}' "
+                            f"epoch={sender_epoch} τ={tau} α={alpha:.4f}"
+                        )
+
+                        aggregatable = Aggregatable(
+                            parameters=aggregatable.parameters,
+                            num_examples=max(1, int(aggregatable.num_examples * alpha)),
+                            metrics=aggregatable.metrics,
+                        )
+
+                    unseen_parameters_from_other_nodes.append(aggregatable)
+
         return unseen_parameters_from_other_nodes
 
     def update_parameters(
@@ -162,6 +182,8 @@ class AsyncFederatedNode:
         upload_only=False,
     ) -> Tuple[Parameters, dict]:
         LOGGER.info(f"node {self.node_id}: in update_parameters")
+        if epoch is not None:
+            self._current_epoch = epoch
         assert isinstance(num_examples, int)
         assert num_examples >= 1
         self_aggregatable = Aggregatable(
@@ -174,6 +196,8 @@ class AsyncFederatedNode:
             model_hash=self.node_id + "_" + str(time.time()),
             epoch=epoch,
             node_id=self.node_id,
+            delay_s=metrics.get("epoch_delay_s", 0.0) if metrics else 0.0,  # ← novo
+            published_at=time.time(),  
         )
         if upload_only:
             return local_parameters, metrics
@@ -229,3 +253,9 @@ class AsyncFederatedNode:
         avg_l1_diff = delta / float(count)
         LOGGER.info(f"    Weight delta (average absolute difference): {avg_l1_diff}")
         return avg_l1_diff
+    
+    def _alpha(self, tau: int) -> float:
+       
+        if tau <= self.hinge_b:
+            return 1.0
+        return 1.0 / (tau - self.hinge_b + 1)

@@ -1,4 +1,4 @@
-from wandb.keras import WandbCallback
+from wandb.integration.keras import WandbCallback
 
 from experiments.utils.base_experiment_runner import BaseExperimentRunner
 from experiments.utils.custom_wandb_callback import CustomWandbCallback

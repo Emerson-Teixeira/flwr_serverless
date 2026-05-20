@@ -1,5 +1,5 @@
 import numpy as np
-from wandb.keras import WandbCallback
+from wandb.integration.keras import WandbCallback
 
 
 from flwr_serverless.keras.example import MnistModelBuilder

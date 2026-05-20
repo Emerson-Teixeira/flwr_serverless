@@ -3,7 +3,8 @@ import os
 from typing import List, Any
 from tensorflow import keras
 from tensorflow.keras.utils import set_random_seed
-from wandb.keras import WandbCallback
+from wandb.integration.keras import WandbCallback
+from experiments.utils.node_logger_callback import NodeEpochLogger
 
 from flwr.common import ndarrays_to_parameters
 
@@ -136,7 +137,6 @@ class FederatedLearningRunner(BaseExperimentRunner):
     ) -> List[keras.Model]:
         nodes = self.create_nodes()
         num_partitions = self.num_nodes
-
         callbacks_per_client = [
             FlwrFederatedCallback(
                 nodes[i],
@@ -154,6 +154,7 @@ class FederatedLearningRunner(BaseExperimentRunner):
             for i_node in range(self.num_nodes):
                 callbacks = [
                     callbacks_per_client[i_node],
+                    NodeEpochLogger(node_id=i_node, min_delay_s=280, max_delay_s=340) if i_node == 2 else NodeEpochLogger(node_id=i_node, min_delay_s=0, max_delay_s=2)  , #simular maquinas aleatorias com atraso 
                 ]
                 if self.config.track:
                     callbacks.append(CustomWandbCallback(i_node))
@@ -179,6 +180,7 @@ class FederatedLearningRunner(BaseExperimentRunner):
                     # validation_data=(self.x_test, self.y_test),
                     # validation_steps=self.test_steps,
                     validation_batch_size=self.batch_size,
+                    verbose=0
                 )
                 futures.append(future)
 
@@ -335,18 +337,32 @@ class FederatedLearningRunner(BaseExperimentRunner):
         return nodes
 
     def evaluate(self):
-        for i_node in [0]:  # range(self.num_nodes):
-            loss1, accuracy1 = self.models[i_node].evaluate(
+        total_loss, total_acc = 0, 0
+        for i_node in range(self.num_nodes):
+            loss, acc = self.models[i_node].evaluate(
                 self.x_test,
                 self.y_test,
                 batch_size=self.batch_size,
                 steps=self.test_steps,
+                verbose=0,
             )
+            print(f"[Nó {i_node}] test_loss: {loss:.4f} | test_accuracy: {acc:.4f}")
+            total_loss += loss
+            total_acc += acc
+
             if self.config.track:
                 import wandb
+                wandb.log({
+                    f"node{i_node}_test_accuracy": acc,   
+                    f"node{i_node}_test_loss": loss,      
+                })
 
-                to_log = {
-                    "test_accuracy": accuracy1,
-                    "test_loss": loss1,
-                }
-                wandb.log(to_log)
+        print(f"\n[Média] test_loss: {total_loss/self.num_nodes:.4f} | test_accuracy: {total_acc/self.num_nodes:.4f}")
+
+        if self.config.track:
+            import wandb
+            wandb.log({
+                "mean_test_accuracy": total_acc / self.num_nodes,
+                "mean_test_loss": total_loss / self.num_nodes,
+            })
+
